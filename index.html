@@ -1733,7 +1733,13 @@ try{if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').ca
 
 {const th=LS.get('rpa_theme');if(th==='light'||th==='dark')document.documentElement.dataset.theme=th;}
 route();
-refresh(false);
+(async()=>{let u;try{u=new URL(location.href)}catch(e){}const otp=u?.searchParams.get('otp'),em=u?.searchParams.get('email');
+  if(otp&&em){history.replaceState(null,'',location.pathname+(location.hash||''));
+    const {error}=await sb.auth.verifyOtp({email:em.trim().toLowerCase(),token:otp.replace(/\D/g,''),type:'email'});
+    if(error){await refresh(false);toast(/expired|invalid/i.test(error.message)?'This login link has expired or was already used. Ask for a new code.':esc(errMsg(error)),6000);return}
+    await refresh(false);if(S.admin&&!S.customer){location.hash='admin'}else if(!S.customer&&!S.student){S.signup=true;location.hash='account'}else{toast(`Welcome back, ${esc((S.customer?.name||'').split(' ')[0]||'')}`)}
+    return}
+  await refresh(false)})();
 sb.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT'&&S.loaded&&!S.busy)refresh(true)});
 </script>
 </body>
