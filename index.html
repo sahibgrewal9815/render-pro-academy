@@ -690,7 +690,7 @@ async function loadAll(){
     if(cust)S.customer={key:uid,name:cust.name,email:cust.email,phone:cust.phone};
     if(mine){
       const local=LS.get('rpa_device_id');
-      if(mine.device_id&&mine.device_id!==local){await sb.auth.signOut();MY.user=null;S.loginErr='<b>You were logged out</b>This course login is linked to another device. Ask Render Pro Academy to reset it if you changed devices.';}
+      if(mine.device_id&&mine.device_id!==local){await logout();MY.user=null;S.loginErr='<b>You were logged out</b>This course login is linked to another device. Ask Render Pro Academy to reset it if you changed devices.';}
       else{progress=await q(sb.from('lesson_progress').select('*').eq('student_id',mine.id));students=[mine];S.student={id:mine.id}}
     }
   }
@@ -1549,6 +1549,7 @@ function route(keepScroll){
 }
 window.addEventListener('hashchange',()=>{S.loginErr='';route(false)});
 
+async function logout(){try{await sb.auth.signOut({scope:'local'})}catch(e){}try{Object.keys(localStorage).filter(k=>k.startsWith('rpa_auth')).forEach(k=>localStorage.removeItem(k))}catch(e){}}
 async function compressImage(file,maxW){
   if(file.size>15e6)throw new Error('That image is over 15 MB. Choose a smaller file.');
   const url=await new Promise((res,rej)=>{const rd=new FileReader();rd.onload=()=>res(rd.result);rd.onerror=rej;rd.readAsDataURL(file)});
@@ -1594,9 +1595,9 @@ const ACT={
   certModal:()=>certModal(),
   galModal:()=>galModal(),
   reviewModal:()=>reviewModal(),
-  studentLogout:()=>act(async()=>{await sb.auth.signOut();S.lesson=null;await refresh(false)},'Logged out'),
-  custLogout:()=>act(async()=>{await sb.auth.signOut();await refresh(false)},'Logged out'),
-  adminLogout:()=>act(async()=>{await sb.auth.signOut();S.aOtp=false;await refresh(false)},'Logged out'),
+  studentLogout:()=>act(async()=>{await logout();S.lesson=null;await refresh(false)},'Logged out'),
+  custLogout:()=>act(async()=>{await logout();await refresh(false)},'Logged out'),
+  adminLogout:()=>act(async()=>{await logout();S.aOtp=false;await refresh(false)},'Logged out'),
   otpReset:()=>{S.otp=false;S.aOtp=false;S.signup=false;S.loginErr='';route(true)},
   otpResend:()=>act(async()=>{const em=curRoute()==='account'?S.otpEmail:S.aEmail;const {error}=await sb.auth.signInWithOtp({email:em,options:{shouldCreateUser:true}});if(error)throw error},'New code sent. Check your email.'),
   atab:a=>{S.atab=a;route(true)},
@@ -1680,7 +1681,7 @@ document.addEventListener('submit',async e=>{const f=e.target;if(!f.dataset.form
       if(error){S.loginErr=errMsg(error);route(true);return}S.aEmail=em;S.aOtp=true;S.loginErr='';route(true)},
     adminVerify:async()=>{const token=String(fd.get('otp')||'').replace(/\D/g,'');setBusy(f,true,'Checking…');const {error}=await sb.auth.verifyOtp({email:S.aEmail,token,type:'email'});
       if(error){setBusy(f,false);S.loginErr=`Check the ${OTP_LEN} digits and try again.`;route(true);return}
-      await loadAll();if(!S.admin){await sb.auth.signOut();await loadAll();S.loginErr='This email isn’t an admin of Render Pro Academy.';S.aOtp=false}else{S.aOtp=false;S.loginErr=''}route(true)},
+      await loadAll();if(!S.admin){await logout();await loadAll();S.loginErr='This email isn’t an admin of Render Pro Academy.';S.aOtp=false}else{S.aOtp=false;S.loginErr=''}route(true)},
     student:async()=>{const id=f.dataset.id;const exp=expiresFrom(fd);if(exp==='')return toast('Pick an end date, or choose Lifetime.');
       const loginId=String(fd.get('loginId')).trim().toUpperCase();const password=String(fd.get('password')).trim();
       const row={name:String(fd.get('name')).trim(),email:String(fd.get('email')).trim(),phone:normPhone(fd.get('phone'))||String(fd.get('phone')).trim(),tier:fd.get('tier'),expires:exp,status:fd.get('status'),perks:{lab:!!fd.get('perk_lab'),store:!!fd.get('perk_store'),review:!!fd.get('perk_review')}};
